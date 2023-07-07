@@ -1,38 +1,40 @@
-#Import the required Libraries
-from tkinter import *
-from tkinter import ttk
+import threading
+import time
+import tkinter
 
-#Define a Function to enable the frame
-def enable(children):
-   for child in children:
-      child.configure(state='enable')
+def wait_for_event(e):
+    while True:
+        # print('\tTHREAD: This is the thread speaking, we are Waiting for event to start..')
+        print("Thread sedang menunggu.")
+        event_is_set = e.wait()
+        # print('\tTHREAD:  WHOOOOOO HOOOO WE GOT A SIGNAL  : %s' % event_is_set)
+        print("Thread menerima sebuah sinyal dan mengerjakannya.")
+        time.sleep(20)
+        e.clear()
+        print("Thread sudah selesai mengerjakan perintah.")
 
-#Create an instance of tkinter frame
-win = Tk()
+# Main code
+window = tkinter.Tk()
+frame1 = tkinter.Frame(window)
+button1 = tkinter.Button(frame1, text="test")
 
-#Set the geometry of tkinter frame
-win.geometry("750x250")
+e = threading.Event()
+t = threading.Thread(name='pausable_thread',
+                     target=wait_for_event,
+                     args=(e,))
+t.start()
+window.mainloop()
 
-#Creates top frame
-frame1 = LabelFrame(win, width= 400, height= 180, bd=5)
-frame1.pack()
 
-#Create an Entry widget in Frame2
-entry1 = ttk.Entry(frame1, width= 40)
-entry1.insert(INSERT,"Enter Your Name")
-entry1.pack()
-entry2= ttk.Entry(frame1, width= 40)
-entry2.insert(INSERT, "Enter Your Email")
-entry2.pack()
 
-#Creates bottom frame
-frame2 = LabelFrame(win, width= 150, height=100)
-frame2.pack()
-
-#Create a Button to enable frame
-button1 = ttk.Button(frame2, text="Enable", command=lambda: enable(frame1.winfo_children()))
-button1.pack()
-for child in frame1.winfo_children():
-   child.configure(state='disable')
-
-win.mainloop()
+# while True:
+#     print('MAIN LOOP: di main loop.')
+#     time.sleep(4)
+#     print('MAIN LOOP: memberikan sebuah sinyal.')
+#     e.set()
+#     print('MAIN LOOP: mengerjakan sesuatu')
+#     time.sleep(4)
+#     print('MAIN LOOP: masih mengerjakan sesuatu')
+#     time.sleep(4)
+#     print('MAIN LOOP: proses terakhir sebelum loop')
+#     time.sleep(2)
