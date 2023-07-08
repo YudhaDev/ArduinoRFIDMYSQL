@@ -8,6 +8,9 @@ import mysql.connector
 from mysql.connector import MySQLConnection
 from enum import Enum
 
+from windowupdatekartu import WindowUpdateKartu
+from db_management import DBManagement
+
 # Inisialiasi UI
 window = tkinter.Tk()
 window.title("Program Scan Kartu")
@@ -39,9 +42,6 @@ def registerRfidBaru():
 # input_kartu_entry = tkinter.Entry(card_info_frame)
 # input_kartu_entry.grid(row=1, column=0)
 
-def startReadSensor():
-    object_sensor.readSensor()
-
 def callback(*args):
     match clicked.get():
         case "Scan":
@@ -54,7 +54,8 @@ def callback(*args):
             object_sensor.reset()
             disableRegisterFrame()
 
-    tkinter.messagebox.showinfo("Perhatian", "Mode berganti ke: "+clicked.get())
+    tkinter.messagebox.showinfo("Perhatian", "Mode berganti ke: " + clicked.get())
+
 
 options = ["Scan", "Register", "Login"]
 clicked = tkinter.StringVar()
@@ -79,20 +80,19 @@ input_nama_entry.grid(row=3, column=0)
 simpan_uid_button = tkinter.Button(card_register_frame, text="Simpan", command=registerRfidBaru)
 simpan_uid_button.grid(row=1, column=1)
 
-sensor_start_button_frame = tkinter.LabelFrame(frame1, text="Start Sensor")
-sensor_start_button_frame.grid(row=0, column=2)
-sensor_start_button = tkinter.Button(sensor_start_button_frame, text="Start Sensor", command=startReadSensor)
-sensor_start_button.grid(row=0, column=0)
-
+update_kartu_button_frame = tkinter.LabelFrame(frame1, text="Buka/Blokir Kartu")
+update_kartu_button_frame.grid(row=0, column=2)
 
 
 def enableRegisterFrame():
     for child in card_register_frame.winfo_children():
         child.configure(state=tkinter.NORMAL)
 
+
 def disableRegisterFrame():
     for child in card_register_frame.winfo_children():
         child.configure(state=tkinter.DISABLED)
+
 
 ################State Awal###################
 disableRegisterFrame()
@@ -104,134 +104,19 @@ sensor_stream_text.grid(row=0, column=0)
 sensor_stream_text.insert("end-1c", "menunggu data sensor... \n")
 sensor_stream_text.insert("end-1c", "menunggu data sensor...")
 
-################################Database#####################################
-class DBManagement:
-    __host = "localhost"
-    __port = 3307
-    __username = "root"
-    __password = "root"
-    __database = "database_sensor"
-    __mysql_connection: MySQLConnection = None
-
-    def connectDB(self):
-        if self.__mysql_connection is None:
-            try:
-                self.__mysql_connection = mysql.connector.connect(host=self.__host, username=self.__username,
-                                                                  password=self.__password)
-                print("Sukses koneksi mysql.")
-            except mysql.connector.Error as err:
-                print("Error koneksi mysql => " + str(err))
-        else:
-            print("Mysql sudah terkoneksi")
-
-    def createDatabase(self):
-        if self.__mysql_connection is None:
-            print("Koneksi ke mysql belum tersambung.")
-        else:
-            mycursor = self.__mysql_connection.cursor(buffered=True)
-            query2 = "SHOW DATABASES LIKE '%" + self.__database + "%'"
-            mycursor.execute(query2)
-            if mycursor.fetchall() == "[]":
-                try:
-                    query_create_db = "CREATE DATABASE " + self.__database
-                    mycursor.execute(query_create_db)
-                    print("Database baru telah dibuat.")
-                except mysql.connector.Error as err:
-                    print("Error membuat database. : " + str(err))
-            else:
-                print("database telah ada.")
-        self.changeDB(self.__database)
-
-    def changeDB(self, db_name):
-        self.__mysql_connection.database = db_name
-
-    def createTable(self, table_name):
-        # query = "SHOW TABLES LIKE '%"+table_name+"%'"
-        # self.__mysql_connection.cursor().execute(query)
-
-        TABLES = {}
-        TABLES[table_name] = (
-                "CREATE TABLE `" + table_name + "`("
-                                                "`id` int(11) NOT NULL AUTO_INCREMENT,"
-                                                "`rfid_number` text,"
-                                                "`name` varchar(20),"
-                                                "`status` int(1) DEFAULT 1,"
-                                                "`date_created` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
-                                                "PRIMARY KEY (`id`))"
-        )
-
-        # self.changeDB(self.__database)
-        mycursor = self.__mysql_connection.cursor(buffered=True)
-        if not self.__mysql_connection is None:
-            query_check_tabel = "SHOW TABLES like '%" + table_name + "%'"
-            mycursor.execute(query_check_tabel)
-            try:
-                # print(str(TABLES[table_name]))
-                mycursor.execute(TABLES[table_name])
-                print("Tabel baru telah dibuat.")
-            except mysql.connector.Error as err:
-                print("error: " + str(err))
-
-    def closeDB(self):
-        if not self.__mysql_connection == 0:
-            self.__mysql_connection.close()
-
-    def regisSensor(self, rfid_number, name):
-        __table_name = "rfid_table"
-        query_insert = '''INSERT INTO ''' + __table_name + ''' (rfid_number, name) VALUES (%s, %s)'''
-
-        query_insert_percobaan = '''INSERT INTO rfid_table (rfid_number, name) VALUES ("2131312", "yudha")'''
-
-        value = (str(rfid_number), str(name))
-
-        query_check_rfid_duplicate = '''SELECT rfid_number FROM rfid_table WHERE rfid_number =''' + "'" + rfid_number + "'"
-        cursor = self.__mysql_connection.cursor(buffered=True)
-        cursor.execute(query_check_rfid_duplicate)
-
-        if cursor.fetchall():
-            return "Duplikasi Kartu, kartu sebelumnya sudah terdaftar."
-        else:
-            try:
-                mycursor = self.__mysql_connection.cursor()
-                mycursor.execute(query_insert, value)
-                self.__mysql_connection.commit()
-            except mysql.connector.Error as err:
-                print(str(err))
-            return "Kartu berhasil disimpan."
-
-    def scanKartu(self, rfid_number):
-        mycursor = self.__mysql_connection.cursor(buffered=True)
-        # query = '''SELECT rfid_number FROM rfid_table WHERE rfid_number LIKE''' + "'%" + rfid_number + "%'"
-        query = '''SELECT * FROM rfid_table WHERE rfid_number LIKE''' + "'%" + rfid_number + "%'"
-        mycursor.execute(query)
-        try:
-            # print("Dari DB:"+str(mycursor.fetchall()[0][1]))
-            return "Selamat Datang."
-        except:
-            return "Kartu belum teregister"
-
-        # if not mycursor.fetchall().count(10) == 0:
-        #     return "Selamat Datang"
-        # else:
-        #     return "Kartu belum teregister."
-
-    def updateSensor(self):
-        return
-
-    def getAllRFID(self):
-        mycursor = self.__mysql_connection.cursor(buffered=True)
-        query_get_all = "SELECT rfid_number FROM rfid_table"
-        mycursor.execute(query_get_all)
-        print(str(mycursor.fetchall()))
-
 
 ##########################################SERIAL##############################################
 class Sensor:
     __string_uid = ""
-    __string_uid_temp = ""
+    __string_uid_temp = "null"
     __bool_update_string_uid = False
+    __status_sensor = "Mati"
+    __check_kartu = 0  # check kartu di login
+
     ports = serial.tools.list_ports.comports()
     serialinst = serial.Serial()
+
+
     portList = []
     print("Port yang sedang terhubung: ")
     for port in ports:
@@ -270,70 +155,59 @@ class Sensor:
         self.__string_uid_temp = ""
         self.__bool_update_string_uid = False
 
+        print("nilai uid sekarang: "+self.__string_uid_temp)
+
+    def closeSerialSensor(self):
+        self.serialinst.close()
 
     def readSensor(self):
-        check = 0
-        while True:
-            # print("heyyy" +str(self.__bool_update_string_uid))
-            # print("Dari sensor (Temp): "+self.__string_uid_temp)
-            # print("Dari sensor : "+self.__string_uid)
+        if self.__status_sensor == "Mati":
+            self.__status_sensor = "Hidup"
+            while True:
+                # get sensor terus
+                # self.__string_uid_temp = str(self.serialinst.readline().decode('utf').rstrip('\n'))
 
-            #get sensor terus
-            # self.__string_uid_temp = self.serialinst.readline().decode('utf').rstrip('\n')
+                if self.serialinst.in_waiting:
+                    self.__string_uid_temp = self.serialinst.readline().decode('utf').rstrip('\n')
 
-            if self.serialinst.in_waiting:
-                self.__string_uid_temp = self.serialinst.readline().decode('utf').rstrip('\n')
+                # Jika mode Scan
+                if clicked.get() == str(options[0]):
+                    print("Masuk Scan.")
+                # Jika mode Register
+                if clicked.get() == str(options[1]):
+                    if not self.__string_uid_temp == "null":
+                        print("lah kok masuk")
+                        input_kartu_entry2.insert(0, self.__string_uid_temp)
+                        # print("Masuk Register.")
+                        return
 
-            #Jika mode Scan
-            if clicked.get() == str(options[0]):
-                print("Masuk Scan.")
-            #Jika mode Register
-            if clicked.get() == str(options[1]):
-                print("Masuk Register.")
-            #Jika mode Login
-            if clicked.get() == str(options[2]):
-                if not self.__string_uid_temp == "":
-                    print("masuk pak eko.")
-                    print("UID_TEMP "+self.__string_uid_temp)
-                    db_object = DBManagement()
-                    db_object.connectDB()
-                    db_object.changeDB("database_sensor")
-                    text = db_object.scanKartu(str(self.__string_uid_temp))
-                    # tkinter.messagebox.showinfo("Perhatian", str(text))
-                    print(text)
-                    time.sleep(2)
-                    self.__string_uid_temp = ""
-                    db_object.closeDB()
+                # Jika mode Login
+                if clicked.get() == str(options[2]):
+                    print("Masuk login.")
+                    if not self.__string_uid_temp == "null":
+                        # print("masuk pak eko.")
+                        # print("UID_TEMP " + self.__string_uid_temp)
+                        db_object = DBManagement()
+                        db_object.connectDB()
+                        db_object.changeDB("database_sensor")
+                        text = db_object.scanKartu(str(self.__string_uid_temp))
+                        if text == "Kartu belum teregister":
+                            self.__check_kartu += 1
+                            if self.__check_kartu == 3:
+                                tkinter.messagebox.showinfo("Perhatian", "kartu terblokir")
+                            else:
+                                tkinter.messagebox.showinfo("Perhatian", text)
+                        else:
+                            tkinter.messagebox.showinfo("Perhatian", str(text))
+                        self.__string_uid_temp = ""
+                        db_object.closeDB()
+                        self.__status_sensor = "Mati"
+                        return
+                time.sleep(1)
 
+        else:
+            print("Sensor sudah berjalan.")
 
-                    # if self.__bool_update_string_uid:
-                        # print("Dari sensor: "+str(self.__string_uid_temp))
-                        # tkinter.messagebox.showinfo("Perhatian", str(object_database.scanKartu(str(self.__string_uid))))
-                        # print("Yudha :" + object_database.scanKartu(self.__string_uid_temp))
-
-                        # # pengecekan duplikasi scan kartu
-                        # print("nilai string uid: " + str(self.__string_uid))
-                        # print("nilai paket: " + str(packet))
-                        # if packet == self.__string_uid:
-                        #     check += 1
-                        # else:
-                        #     check = 1
-                        #
-                        # if check == 3:
-                        #     print("Kartu terblokir!")
-                        #
-                        # self.__string_uid = packet
-                        # self.__bool_update_string_uid = True
-                        # print("nilai check:" + str(check))
-
-            print("UID_TEMP SEHABIS "+self.__string_uid_temp)
-            # if not self.__string_uid == self.__string_uid_temp:
-            #     self.__bool_update_string_uid = True
-            # else:
-            #     self.__bool_update_string_uid = False
-
-            self.__string_uid = self.__string_uid_temp
-            # print(self.__bool_update_string_uid)
 
 #######################################Inisialisasi DB#################################
 object_database = DBManagement()
@@ -345,27 +219,62 @@ object_database.closeDB()
 
 # Object Sensor
 object_sensor = Sensor()
-threading_sensor = threading.Thread(target=object_sensor.readSensor)
-threading_sensor.start()
+
+
+# object_sensor.readSensor()
+# threading_sensor = threading.Thread(target=object_sensor.readSensor)
+# threading_sensor.start()
+
+# fungsi buka window baru
+def openWindowBukaBlokir():
+    window_baru = WindowUpdateKartu(window)
+    object_sensor.closeSerialSensor()
+    window_baru.openBukaBlokirKartuWindow()
+    window_baru.bacaSensor()
+
+
+def startStopSensor():
+    object_sensor.readSensor()
+
+
+update_kartu_button = tkinter.Button(update_kartu_button_frame, text="Buka/Blokir Kartu", command=openWindowBukaBlokir)
+update_kartu_button.grid(row=0, column=0)
+
+sensor_start_button_label_frame = tkinter.LabelFrame(frame1, text="Tombol Scan Sensor")
+sensor_start_button_label_frame.grid(row=1, column=0)
+sensor_start_button = tkinter.Button(sensor_start_button_label_frame, text="Start Sensor", command=startStopSensor)
+sensor_start_button.grid(row=0, column=0)
+
+sensor_status_label_frame = tkinter.LabelFrame(frame1, text="Status Sensor Sekarang:")
+sensor_status_label_frame.grid(row=1, column=1)
+
+sensor_status_text = tkinter.Label(sensor_status_label_frame, text="Mati")
+sensor_status_text.grid(row=0, column=0)
+
 
 # Set UI
 def updateUI():
     while True:
         # if object_sensor.getBoolUpdateStringUid():
         #     print("masuk")
-            # input_kartu_entry.delete(0, "end")
-            # input_kartu_entry.insert(0, str(object_sensor.getStringUid()))
-            # input_kartu_entry2.insert(0, str(object_sensor.getStringUidTemp())
-            # object_sensor.setBoolUpdateStringUid(False)
+        # input_kartu_entry.delete(0, "end")
+        # input_kartu_entry.insert(0, str(object_sensor.getStringUid()))
+        # input_kartu_entry2.insert(0, str(object_sensor.getStringUidTemp())
+        # object_sensor.setBoolUpdateStringUid(False)
         # sensor_stream_text.insert("1.0", object_sensor.serialinst.readline().decode('utf'))
 
         input_kartu_entry2.delete(0, "end")
         input_kartu_entry2.insert(0, object_sensor.getStringUidTemp())
         sensor_stream_text.insert("1.0", object_sensor.getStringUidTemp())
-        time.sleep(0.25)
+
+        # # check semua thread
+        # for thread in threading.enumerate():
+        #     print(thread.name)
+
+        time.sleep(1)
 
 
-threading_ui = threading.Thread(target=updateUI)
-threading_ui.start()
+# threading_ui = threading.Thread(target=updateUI)
+# threading_ui.start()
 
 window.mainloop()
