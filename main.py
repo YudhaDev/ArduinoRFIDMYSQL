@@ -149,6 +149,11 @@ class Sensor:
 
     def setBoolUpdateStringUid(self, boolean):
         self.__bool_update_string_uid = boolean
+    def getStatusSensor(self):
+        return self.__status_sensor
+
+    def setStatusSensor(self, value_sensor):
+        self.__status_sensor = value_sensor
 
     def reset(self):
         self.__string_uid = ""
@@ -161,14 +166,16 @@ class Sensor:
         self.serialinst.close()
 
     def readSensor(self):
-        if self.__status_sensor == "Mati":
-            self.__status_sensor = "Hidup"
+        if self.__status_sensor == "Hidup":
+            self.__status_sensor = "Mati"
             while True:
                 # get sensor terus
                 # self.__string_uid_temp = str(self.serialinst.readline().decode('utf').rstrip('\n'))
 
                 if self.serialinst.in_waiting:
                     self.__string_uid_temp = self.serialinst.readline().decode('utf').rstrip('\n')
+
+                print("Nilai uid temp: "+str(self.__string_uid_temp))
 
                 # Jika mode Scan
                 if clicked.get() == str(options[0]):
@@ -203,7 +210,7 @@ class Sensor:
                         db_object.closeDB()
                         self.__status_sensor = "Mati"
                         return
-                time.sleep(1)
+                time.sleep(0.25)
 
         else:
             print("Sensor sudah berjalan.")
@@ -234,6 +241,7 @@ def openWindowBukaBlokir():
 
 
 def startStopSensor():
+    object_sensor.setStatusSensor("Hidup")
     object_sensor.readSensor()
 
 
